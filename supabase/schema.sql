@@ -127,3 +127,12 @@ VALUES (
     120,
     TRUE
 ) ON CONFLICT (key_hash) DO NOTHING;
+
+-- ------------------------------------------------------------------------------
+-- 7. Row Level Security (RLS) - Secure Defaults
+-- ------------------------------------------------------------------------------
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cache_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.request_logs ENABLE ROW LEVEL SECURITY;
