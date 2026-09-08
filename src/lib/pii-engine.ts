@@ -34,8 +34,7 @@ export function redactPII(input: string): PiiRedactionResult {
     return { sanitizedText: input || '', count: 0, detectedTypes: [] };
   }
 
-  // Bound check for event loop safety
-  let text = input.length > MAX_SCAN_LENGTH ? input.slice(0, MAX_SCAN_LENGTH) : input;
+  let text = input;
   const detectedTypesSet = new Set<PiiType>();
   let totalCount = 0;
 
@@ -115,15 +114,29 @@ export function scrubMessages(messages: ChatMessage[]): {
   const detectedTypesSet = new Set<PiiType>();
 
   const sanitizedMessages = messages.map((msg) => {
-    // Only scrub user and system messages (preserve assistant tool calls if any)
-    if (msg.role === 'user' || msg.role === 'system') {
-      const result = redactPII(msg.content);
-      totalPiiCount += result.count;
-      result.detectedTypes.forEach((t) => detectedTypesSet.add(t));
-      return {
-        ...msg,
-        content: result.sanitizedText,
-      };
+    // Scrub user, system, and developer role prompts (preserve assistant tool calls)
+    if (msg.role === 'user' || msg.role === 'system' || (msg.role as string) === 'developer') {
+      if (typeof msg.content === 'string') {
+        const result = redactPII(msg.content);
+        totalPiiCount += result.count;
+        result.detectedTypes.forEach((t) => detectedTypesSet.add(t));
+        return {
+          ...msg,
+          content: result.sanitizedText,
+        };
+      } else if (Array.isArray(msg.content)) {
+        // Multimodal content parts
+        const newParts = msg.content.map((part: any) => {
+          if (part && part.type === 'text' && typeof part.text === 'string') {
+            const result = redactPII(part.text);
+            totalPiiCount += result.count;
+            result.detectedTypes.forEach((t) => detectedTypesSet.add(t));
+            return { ...part, text: result.sanitizedText };
+          }
+          return part;
+        });
+        return { ...msg, content: newParts };
+      }
     }
     return msg;
   });

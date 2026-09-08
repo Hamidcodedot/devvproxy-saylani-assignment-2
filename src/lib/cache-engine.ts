@@ -30,11 +30,16 @@ export interface CacheKeyParams {
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
+  response_format?: any;
+  tools?: any[];
+  tool_choice?: any;
+  stop?: string | string[];
+  seed?: number;
 }
 
 /**
  * Computes a deterministic SHA-256 hash for a request payload
- * Scoped by keyId and canonical messages to ensure zero cross-tenant collisions
+ * Scoped by keyId, canonical messages, and schema parameters to ensure zero collisions
  */
 export function generateCacheKey(params: CacheKeyParams): string {
   const normalized = {
@@ -42,12 +47,20 @@ export function generateCacheKey(params: CacheKeyParams): string {
     model: params.model.toLowerCase().trim(),
     messages: params.rawMessages.map((m) => ({
       role: m.role,
-      content: (m.content || '').trim().normalize('NFC'),
+      content:
+        typeof m.content === 'string'
+          ? m.content.trim().normalize('NFC')
+          : canonicalize(m.content),
       name: m.name || undefined,
     })),
     temperature: params.temperature ?? 1.0,
     top_p: params.top_p ?? 1.0,
     max_tokens: params.max_tokens ?? null,
+    response_format: params.response_format ? canonicalize(params.response_format) : null,
+    tools: params.tools ? canonicalize(params.tools) : null,
+    tool_choice: params.tool_choice ? canonicalize(params.tool_choice) : null,
+    stop: params.stop || null,
+    seed: params.seed ?? null,
   };
 
   const canonicalString = JSON.stringify(canonicalize(normalized));
@@ -56,6 +69,7 @@ export function generateCacheKey(params: CacheKeyParams): string {
 
 /**
  * Checks in-memory hot cache first, then calls optional fallback
+ * Implements LRU order refresh
  */
 export function getHotCacheEntry(cacheHash: string): CacheEntry | null {
   const entry = hotCache.get(cacheHash);
@@ -67,8 +81,11 @@ export function getHotCacheEntry(cacheHash: string): CacheEntry | null {
     return null;
   }
 
+  // Refresh LRU order
+  hotCache.delete(cacheHash);
   entry.hit_count += 1;
   entry.last_accessed_at = new Date().toISOString();
+  hotCache.set(cacheHash, entry);
   return entry;
 }
 

@@ -83,6 +83,11 @@ export async function POST(req: NextRequest) {
       temperature,
       top_p,
       max_tokens,
+      response_format: (body as any).response_format,
+      tools: (body as any).tools,
+      tool_choice: (body as any).tool_choice,
+      stop: (body as any).stop,
+      seed: (body as any).seed,
     });
 
     const cachedEntry = getHotCacheEntry(cacheKey);

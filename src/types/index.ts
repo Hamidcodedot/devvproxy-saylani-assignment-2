@@ -7,8 +7,8 @@ export interface PiiRedactionResult {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  role: 'system' | 'user' | 'assistant' | 'tool' | 'developer';
+  content: string | any[];
   name?: string;
 }
 

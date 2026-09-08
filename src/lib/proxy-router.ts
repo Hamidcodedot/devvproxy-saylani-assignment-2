@@ -11,8 +11,8 @@ const GROQ_MODEL_MAP: Record<string, string> = {
   'qwen/qwen3.6-27b': 'qwen/qwen3.6-27b',
 };
 
-// 8-second timeout for primary provider to avoid stalling the client
-const PRIMARY_TIMEOUT_MS = 8000;
+// 15-second timeout for primary provider to accommodate deep reasoning while avoiding stalls
+const PRIMARY_TIMEOUT_MS = 15000;
 
 export interface DispatchResult {
   response: ChatCompletionResponse;
@@ -153,9 +153,9 @@ export async function dispatchCompletion(
         throw new Error(errorJson?.error?.message || `Upstream HTTP ${res.status}`);
       }
     } catch (err: any) {
-      // If error is 400/401, rethrow
+      // If error is 400/401/403, rethrow directly
       if (err.message && !err.message.includes('abort') && !err.message.includes('429') && !err.message.includes('50')) {
-        // Continue to failover only on network/rate-limit/timeout
+        throw err;
       }
     }
   }
@@ -163,6 +163,8 @@ export async function dispatchCompletion(
   // 3. Failover Provider: Groq
   if (groqKey) {
     try {
+      const groqController = new AbortController();
+      const groqTimeout = setTimeout(() => groqController.abort(), 12000);
       const groqModel = GROQ_MODEL_MAP[payload.model] || 'groq/compound-mini';
       const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -174,7 +176,9 @@ export async function dispatchCompletion(
           ...upstreamPayload,
           model: groqModel,
         }),
+        signal: groqController.signal,
       });
+      clearTimeout(groqTimeout);
 
       if (groqRes.ok) {
         const groqData: ChatCompletionResponse = await groqRes.json();

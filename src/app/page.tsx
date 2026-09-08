@@ -13,7 +13,10 @@ import {
   Sparkles,
   CheckCircle2,
   Cpu,
+  Clock,
 } from 'lucide-react';
+import { ArchitectureVisualizer } from '@/components/ArchitectureVisualizer';
+import { ProductRoadmap } from '@/components/ProductRoadmap';
 
 export default function HomePage() {
   return (
@@ -48,10 +51,16 @@ export default function HomePage() {
             Sign In
           </Link>
           <Link
+            href="/signup"
+            className="hidden sm:inline-flex px-3 py-1.5 rounded bg-surface-2 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-border-subtle font-medium transition-colors"
+          >
+            Create Account
+          </Link>
+          <Link
             href="/dashboard"
             className="px-3.5 py-1.5 rounded bg-white hover:bg-zinc-200 text-black font-bold transition-all flex items-center gap-1.5"
           >
-            <span>Launch Console</span>
+            <span>Console</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -61,7 +70,7 @@ export default function HomePage() {
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-16 sm:py-24 space-y-24">
         <div className="text-center space-y-6 max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-1 border border-border-subtle text-xs font-mono text-zinc-400">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Edge AI Firewall & Caching Gateway</span>
             <span className="text-zinc-600">•</span>
             <span className="text-emerald-400 font-semibold">1-Line Setup</span>
@@ -77,17 +86,23 @@ export default function HomePage() {
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2 font-mono text-xs">
             <Link
-              href="/dashboard"
+              href="/signup"
               className="px-6 py-3 rounded-md bg-white hover:bg-zinc-200 text-black font-bold flex items-center gap-2 transition-all shadow-md"
             >
-              <span>Open Live Sandbox</span>
+              <span>Get Started Free</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="/docs"
-              className="px-6 py-3 rounded-md bg-surface-1 hover:bg-surface-2 text-zinc-300 hover:text-white border border-border-subtle transition-all"
+              href="/dashboard"
+              className="px-6 py-3 rounded-md bg-surface-1 hover:bg-surface-2 text-zinc-300 hover:text-white border border-border-subtle transition-all flex items-center gap-2"
             >
-              Read Documentation
+              <span>Launch Live Console</span>
+            </Link>
+            <Link
+              href="/docs"
+              className="px-5 py-3 rounded-md text-zinc-400 hover:text-white transition-colors"
+            >
+              Docs & Quickstart →
             </Link>
           </div>
         </div>
@@ -99,7 +114,7 @@ export default function HomePage() {
               <Terminal className="w-4 h-4 text-primary" />
               <span>Zero Application Code Refactoring Required</span>
             </div>
-            <span className="text-[11px] font-mono text-emerald-400">Works with OpenAI, LangChain, Vercel AI</span>
+            <span className="text-[11px] font-mono text-emerald-400">Works with OpenAI, LangChain, Vercel AI SDK</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
@@ -135,7 +150,21 @@ client = OpenAI(
               </pre>
             </div>
           </div>
+
+          {/* Compatibility & Disclosure Footnote */}
+          <div className="pt-2 text-[11px] font-mono text-zinc-500 flex items-center justify-between">
+            <span>Compatible with any OpenAI wire-protocol client (Python, Node.js, cURL).</span>
+            <span className="text-zinc-400 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-primary" />
+              <span>SSE Streaming scheduled for v1.1 (Phase 2)</span>
+            </span>
+          </div>
         </div>
+
+        {/* Visual Architecture Pipeline */}
+        <section aria-label="Architecture Pipeline Visualizer">
+          <ArchitectureVisualizer />
+        </section>
 
         {/* 3 Core Pillars Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -179,6 +208,11 @@ client = OpenAI(
           </div>
         </div>
 
+        {/* Product Roadmap Section */}
+        <section aria-label="Product Roadmap">
+          <ProductRoadmap />
+        </section>
+
         {/* Ecosystem Continuity Banner */}
         <div className="p-6 rounded-xl bg-surface-1 border border-border-subtle flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -218,6 +252,14 @@ client = OpenAI(
             <Link href="/docs" className="hover:text-white transition-colors">Docs</Link>
             <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
             <Link href="/login" className="hover:text-white transition-colors">Console</Link>
+            <a
+              href="https://github.com/Hamidcodedot/devvproxy-saylani-assignment-2"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-white transition-colors"
+            >
+              GitHub
+            </a>
           </div>
         </div>
       </footer>

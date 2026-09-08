@@ -75,6 +75,18 @@ export function Navbar({
           <BookOpen className="w-3.5 h-3.5" />
           Docs
         </Link>
+
+        {/* GitHub Link */}
+        <a
+          href="https://github.com/Hamidcodedot/devvproxy-saylani-assignment-2"
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono text-zinc-400 hover:text-white hover:bg-surface-1 transition-colors"
+          title="GitHub Repository"
+        >
+          <Github className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">GitHub</span>
+        </a>
       </div>
     </header>
   );
