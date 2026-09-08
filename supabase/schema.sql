@@ -101,7 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_request_logs_key_id ON request_logs(key_id);
 -- ------------------------------------------------------------------------------
 INSERT INTO users (id, email, password_hash, name, role)
 VALUES (
-    'u0000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000001',
     'demo@devvproxy.com',
     'f6c07044431e67041530e7ab21e3f8fe43916964177d6ee47ea6d1230e9dcf5c', -- sha256('demo123')
     'Demo Evaluator',
@@ -110,8 +110,8 @@ VALUES (
 
 INSERT INTO subscriptions (id, user_id, plan, status, provider)
 VALUES (
-    's0000000-0000-0000-0000-000000000001',
-    'u0000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000001',
     'pro',
     'active',
     'manual'
@@ -119,8 +119,8 @@ VALUES (
 
 INSERT INTO api_keys (id, user_id, name, key_hash, prefix, rate_limit_rpm, is_active)
 VALUES (
-    'a0000000-0000-0000-0000-000000000001',
-    'u0000000-0000-0000-0000-000000000001',
+    '00000000-0000-0000-0000-000000000003',
+    '00000000-0000-0000-0000-000000000001',
     'Production Default Key',
     '310e30907e5b3ee5895bbdce3dbbb577e9238384fa6e8971fbe96f131a2386a3', -- sha256('devv_live_demo_9481b37c')
     'devv_live_demo',

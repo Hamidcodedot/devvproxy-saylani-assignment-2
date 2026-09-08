@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
@@ -28,6 +28,9 @@ yarn-error.log*
 
 # Vercel
 .vercel
+
+# Supabase
+supabase/.temp/
 
 # TypeScript
 *.tsbuildinfo

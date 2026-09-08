@@ -9,7 +9,7 @@ const inMemoryUsers = new Map<string, { user: User; passwordHash: string }>();
 
 // Pre-seed Demo User for 1-Click Evaluator access
 const DEMO_USER: User = {
-  id: 'u0000000-0000-0000-0000-000000000001',
+  id: '00000000-0000-0000-0000-000000000001',
   email: 'demo@devvproxy.com',
   name: 'Demo Evaluator',
   role: 'developer',

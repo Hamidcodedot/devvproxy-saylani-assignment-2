@@ -23,7 +23,7 @@ const DEFAULT_DEMO_KEY = process.env.DEVV_DEFAULT_KEY || 'devv_live_demo_9481b37
 const DEFAULT_KEY_HASH = crypto.createHash('sha256').update(DEFAULT_DEMO_KEY).digest('hex');
 
 inMemoryKeys.set(DEFAULT_KEY_HASH, {
-  id: 'a0000000-0000-0000-0000-000000000001',
+  id: '00000000-0000-0000-0000-000000000003',
   name: 'Default Master Demo Key',
   key_hash: DEFAULT_KEY_HASH,
   prefix: 'devv_live_demo',
@@ -40,7 +40,7 @@ for (let i = 12; i >= 1; i--) {
   const piiCount = i % 3 === 0 ? 2 : 0;
   inMemoryLogs.push({
     id: `log-${Date.now() - i * 45000}`,
-    key_id: 'a0000000-0000-0000-0000-000000000001',
+    key_id: '00000000-0000-0000-0000-000000000003',
     model: SAMPLE_MODELS[i % SAMPLE_MODELS.length],
     upstream_provider: isCache ? 'cache' : (i % 5 === 0 ? 'groq' : 'openai'),
     prompt_tokens: Math.round(tokens * 0.4),
