@@ -10,17 +10,17 @@ import { TelemetryFeed } from '@/components/TelemetryFeed';
 import { QuickStart } from '@/components/QuickStart';
 import { KeyManagerModal } from '@/components/KeyManagerModal';
 import { DashboardStats, RequestLog, ApiKeyRecord } from '@/types';
-import { Shield, LogOut, User as UserIcon, ArrowRight } from 'lucide-react';
+import { Shield, LogOut, User as UserIcon, ArrowRight, RotateCcw, Sparkles } from 'lucide-react';
 
 const INITIAL_STATS: DashboardStats = {
-  totalRequests: 14290,
-  totalTokensProcessed: 1840000,
-  tokensSavedViaCache: 1280000,
-  dollarsSavedTotal: 34.65,
-  piiEntitiesRedacted: 412,
-  cacheHitRatePct: 68,
-  avgCacheLatencyMs: 14,
-  avgUpstreamLatencyMs: 415,
+  totalRequests: 0,
+  totalTokensProcessed: 0,
+  tokensSavedViaCache: 0,
+  dollarsSavedTotal: 0,
+  piiEntitiesRedacted: 0,
+  cacheHitRatePct: 0,
+  avgCacheLatencyMs: 0,
+  avgUpstreamLatencyMs: 0,
   systemStatus: 'operational',
 };
 
@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const [activeKeyToken, setActiveKeyToken] = useState<string>('devv_live_demo_9481b37c');
   const [isKeyModalOpen, setIsKeyModalOpen] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
 
   // Check authentication status
   useEffect(() => {
@@ -101,6 +102,37 @@ export default function DashboardPage() {
     router.refresh();
   };
 
+  const handleResetDemo = async () => {
+    setIsActionLoading(true);
+    try {
+      // Immediate optimistic update to 0
+      setStats(INITIAL_STATS);
+      setLogs([]);
+      await fetch('/api/analytics', { method: 'DELETE' });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to reset demo data:', err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleSeedDemo = async () => {
+    setIsActionLoading(true);
+    try {
+      await fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'seed' }),
+      });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to seed demo data:', err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center text-xs font-mono text-zinc-400 gap-3">
@@ -156,6 +188,26 @@ export default function DashboardPage() {
             <p className="text-xs text-zinc-400 mt-1 font-sans">
               Live edge gateway telemetry, side-by-side security sandbox, and key vault.
             </p>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleResetDemo}
+              disabled={isActionLoading || isRefreshing}
+              className="px-3 py-1.5 rounded-md bg-surface-2 hover:bg-zinc-800 border border-border-subtle text-xs font-mono text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-50"
+              title="Reset metrics to 0, flush L1 cache and PostgreSQL request logs"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isActionLoading ? 'animate-spin text-primary' : ''}`} />
+              <span>Reset Demo</span>
+            </button>
+            <button
+              onClick={handleSeedDemo}
+              disabled={isActionLoading || isRefreshing}
+              className="px-3 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-mono text-emerald-400 transition-all flex items-center gap-1.5 disabled:opacity-50"
+              title="Generate sample traffic for presentation demo"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Seed Traffic</span>
+            </button>
           </div>
         </div>
 

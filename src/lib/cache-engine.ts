@@ -140,3 +140,11 @@ export function calculateCostSavings(tokens: number, model: string): number {
   }
   return Number(((tokens / 1000) * ratePer1k).toFixed(6));
 }
+
+/**
+ * Resets/clears the in-memory hot cache
+ */
+export function clearHotCache(): void {
+  hotCache.clear();
+}
+

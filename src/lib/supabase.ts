@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { ApiKeyRecord, DashboardStats, RequestLog } from '@/types';
-import { calculateCostSavings } from './cache-engine';
+import { calculateCostSavings, clearHotCache } from './cache-engine';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,31 +31,6 @@ inMemoryKeys.set(DEFAULT_KEY_HASH, {
   is_active: true,
   created_at: new Date().toISOString(),
 });
-
-// Pre-seed realistic telemetry data for instant visual presentation impact
-const SAMPLE_MODELS = ['gpt-4o-mini', 'gpt-4o', 'llama-3.3-70b-versatile'];
-for (let i = 12; i >= 1; i--) {
-  const isCache = i % 2 === 0;
-  const tokens = isCache ? 420 : 850;
-  const piiCount = i % 3 === 0 ? 2 : 0;
-  inMemoryLogs.push({
-    id: `log-${Date.now() - i * 45000}`,
-    key_id: '00000000-0000-0000-0000-000000000003',
-    model: SAMPLE_MODELS[i % SAMPLE_MODELS.length],
-    upstream_provider: isCache ? 'cache' : (i % 5 === 0 ? 'groq' : 'openai'),
-    prompt_tokens: Math.round(tokens * 0.4),
-    completion_tokens: Math.round(tokens * 0.6),
-    total_tokens: tokens,
-    latency_ms: isCache ? Math.floor(Math.random() * 12 + 8) : Math.floor(Math.random() * 280 + 310),
-    cache_hit: isCache,
-    pii_scrubbed_count: piiCount,
-    pii_types_detected: piiCount > 0 ? ['EMAIL', 'CREDIT_CARD'] : [],
-    estimated_cost_usd: (tokens / 1000) * 0.00035,
-    cost_saved_usd: isCache ? (tokens / 1000) * 0.00035 : 0,
-    status_code: 200,
-    created_at: new Date(Date.now() - i * 45000).toISOString(),
-  });
-}
 
 /**
  * Authenticates a Bearer API token against Supabase or in-memory store
@@ -155,7 +130,7 @@ export async function getDashboardData(): Promise<{
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         logs = data as RequestLog[];
       }
     } catch {
@@ -189,16 +164,16 @@ export async function getDashboardData(): Promise<{
   }
 
   const cacheHitRatePct = totalRequests > 0 ? Math.round((cacheHits / totalRequests) * 100) : 0;
-  const avgCacheLatencyMs = cacheHits > 0 ? Math.round(cacheLatencySum / cacheHits) : 16;
-  const avgUpstreamLatencyMs = upstreamCount > 0 ? Math.round(upstreamLatencySum / upstreamCount) : 410;
+  const avgCacheLatencyMs = cacheHits > 0 ? Math.round(cacheLatencySum / cacheHits) : 0;
+  const avgUpstreamLatencyMs = upstreamCount > 0 ? Math.round(upstreamLatencySum / upstreamCount) : 0;
 
   const stats: DashboardStats = {
-    totalRequests: totalRequests + 14280, // Anchored baseline matching Stitch design
-    totalTokensProcessed: totalTokensProcessed + 1840000,
-    tokensSavedViaCache: tokensSavedViaCache + 1280000,
-    dollarsSavedTotal: Number((dollarsSavedTotal + 34.65).toFixed(2)),
-    piiEntitiesRedacted: piiEntitiesRedacted + 412,
-    cacheHitRatePct: cacheHitRatePct > 0 ? cacheHitRatePct : 68,
+    totalRequests,
+    totalTokensProcessed,
+    tokensSavedViaCache,
+    dollarsSavedTotal: Number(dollarsSavedTotal.toFixed(4)),
+    piiEntitiesRedacted,
+    cacheHitRatePct,
     avgCacheLatencyMs,
     avgUpstreamLatencyMs,
     systemStatus: 'operational',
@@ -211,6 +186,65 @@ export async function getDashboardData(): Promise<{
     recentLogs: logs.slice(0, 25),
     keys,
   };
+}
+
+/**
+ * Resets the demo: clears in-memory logs, clears cache, and resets Supabase request logs
+ */
+export async function resetDashboardData(): Promise<void> {
+  // 1. Clear in-memory ring buffer
+  inMemoryLogs.length = 0;
+
+  // 2. Clear hot cache
+  clearHotCache();
+
+  // 3. Clear Supabase request_logs
+  if (supabase) {
+    try {
+      await supabase
+        .from('request_logs')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+    } catch (err) {
+      console.error('Failed to reset Supabase logs', err);
+    }
+  }
+}
+
+/**
+ * Optional: Seeds sample demo traffic on demand for presentations
+ */
+export async function seedDemoLogs(): Promise<void> {
+  const SAMPLE_MODELS = ['gpt-4o-mini', 'gpt-4o', 'llama-3.3-70b-versatile'];
+  for (let i = 8; i >= 1; i--) {
+    const isCache = i % 2 === 0;
+    const tokens = isCache ? 420 : 850;
+    const piiCount = i % 3 === 0 ? 2 : 0;
+    const logItem: RequestLog = {
+      id: crypto.randomUUID(),
+      key_id: '00000000-0000-0000-0000-000000000003',
+      model: SAMPLE_MODELS[i % SAMPLE_MODELS.length],
+      upstream_provider: isCache ? 'cache' : (i % 4 === 0 ? 'groq' : 'openai'),
+      prompt_tokens: Math.round(tokens * 0.4),
+      completion_tokens: Math.round(tokens * 0.6),
+      total_tokens: tokens,
+      latency_ms: isCache ? Math.floor(Math.random() * 8 + 3) : Math.floor(Math.random() * 200 + 260),
+      cache_hit: isCache,
+      pii_scrubbed_count: piiCount,
+      pii_types_detected: piiCount > 0 ? ['EMAIL', 'CREDIT_CARD'] : [],
+      estimated_cost_usd: (tokens / 1000) * 0.00035,
+      cost_saved_usd: isCache ? (tokens / 1000) * 0.00035 : 0,
+      status_code: 200,
+      created_at: new Date(Date.now() - i * 35000).toISOString(),
+    };
+
+    inMemoryLogs.push(logItem);
+    if (supabase) {
+      try {
+        await supabase.from('request_logs').insert(logItem);
+      } catch {}
+    }
+  }
 }
 
 /**
