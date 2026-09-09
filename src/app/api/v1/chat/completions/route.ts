@@ -9,6 +9,11 @@ import {
 } from '@/lib/cache-engine';
 import { dispatchCompletion } from '@/lib/proxy-router';
 import { ChatCompletionRequest, ChatCompletionResponse } from '@/types';
+import {
+  checkRateLimit,
+  getRateLimitHeaders,
+  formatRateLimitError,
+} from '@/lib/rate-limiter';
 
 // Enforce Node.js runtime for full crypto compatibility & long timeouts
 export const runtime = 'nodejs';
@@ -35,6 +40,26 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    // 2. Edge Rate Limiter (Sliding Window RPM Enforcement)
+    const rateLimit = checkRateLimit(
+      `key:${keyRecord.id}`,
+      keyRecord.rate_limit_rpm || 60
+    );
+
+    if (!rateLimit.allowed) {
+      const errorBody = formatRateLimitError(rateLimit);
+      const rlHeaders = getRateLimitHeaders(rateLimit);
+      return NextResponse.json(errorBody, {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...rlHeaders,
+        },
+      });
+    }
+
+    const rateLimitHeaders = getRateLimitHeaders(rateLimit);
 
     // 2. Parse & Validate Incoming Request Body
     const body: ChatCompletionRequest = await req.json().catch(() => null);
@@ -139,6 +164,7 @@ export async function POST(req: NextRequest) {
           'X-Devv-Provider': 'cache',
           'X-Devv-Latency-Saved-Ms': `${Math.max(0, 420 - latencyMs)}`,
           'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
+          ...rateLimitHeaders,
         },
       });
     }
@@ -203,6 +229,7 @@ export async function POST(req: NextRequest) {
         'X-Devv-Cache': 'MISS',
         'X-Devv-Provider': dispatchResult.provider,
         'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
+        ...rateLimitHeaders,
       },
     });
   } catch (error: any) {

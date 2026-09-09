@@ -24,6 +24,7 @@ export function KeyManagerModal({
   onSelectKey,
 }: KeyManagerModalProps) {
   const [newKeyName, setNewKeyName] = useState('');
+  const [rateLimitRpm, setRateLimitRpm] = useState<number>(60);
   const [isCreating, setIsCreating] = useState(false);
   const [newlyGeneratedKey, setNewlyGeneratedKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
@@ -37,7 +38,7 @@ export function KeyManagerModal({
       const res = await fetch('/api/keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newKeyName }),
+        body: JSON.stringify({ name: newKeyName, rateLimitRpm }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -121,7 +122,7 @@ export function KeyManagerModal({
             <label className="text-xs font-mono text-zinc-400 block">
               Generate New Virtual Key
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 value={newKeyName}
@@ -129,10 +130,21 @@ export function KeyManagerModal({
                 placeholder="e.g. Staging App, CI/CD Pipeline"
                 className="flex-1 px-3 py-1.5 rounded-md bg-surface-2 border border-border-subtle text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus:border-primary"
               />
+              <select
+                value={rateLimitRpm}
+                onChange={(e) => setRateLimitRpm(Number(e.target.value))}
+                className="px-2.5 py-1.5 rounded-md bg-surface-2 border border-border-subtle text-xs font-mono text-zinc-300 focus:outline-none focus:border-primary cursor-pointer"
+                title="Requests Per Minute Rate Limit"
+              >
+                <option value={30}>30 RPM (Strict)</option>
+                <option value={60}>60 RPM (Default)</option>
+                <option value={120}>120 RPM (Standard)</option>
+                <option value={300}>300 RPM (High-Volume)</option>
+              </select>
               <button
                 onClick={handleCreate}
                 disabled={!newKeyName.trim() || isCreating}
-                className="px-4 py-1.5 rounded-md bg-primary hover:bg-primary-bright text-black font-mono font-bold text-xs flex items-center gap-1 disabled:opacity-50"
+                className="px-4 py-1.5 rounded-md bg-primary hover:bg-primary-bright text-black font-mono font-bold text-xs flex items-center justify-center gap-1 disabled:opacity-50 shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Generate
@@ -165,9 +177,12 @@ export function KeyManagerModal({
                           Selected
                         </span>
                       )}
+                      <span className="px-1.5 py-0.5 rounded bg-surface-1 border border-border-subtle text-[10px] text-zinc-400">
+                        {k.rate_limit_rpm} RPM
+                      </span>
                     </div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">
-                      {k.prefix} • {k.rate_limit_rpm} RPM • {k.is_active ? 'Active' : 'Revoked'}
+                      {k.prefix} • {k.is_active ? 'Active' : 'Revoked'}
                     </div>
                   </div>
 

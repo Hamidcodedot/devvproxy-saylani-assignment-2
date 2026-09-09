@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { ApiKeyRecord, DashboardStats, RequestLog } from '@/types';
 import { calculateCostSavings, clearHotCache } from './cache-engine';
+import { clearRateLimits } from './rate-limiter';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -44,7 +45,13 @@ export async function authenticateApiKey(bearerToken: string): Promise<ApiKeyRec
   // Check in-memory first for O(1) instant resolution
   const memRecord = inMemoryKeys.get(keyHash);
   if (memRecord && memRecord.is_active) {
-    return memRecord;
+    try {
+      if (crypto.timingSafeEqual(Buffer.from(keyHash), Buffer.from(memRecord.key_hash))) {
+        return memRecord;
+      }
+    } catch {
+      return null;
+    }
   }
 
   // Check Supabase if configured
@@ -198,7 +205,10 @@ export async function resetDashboardData(): Promise<void> {
   // 2. Clear hot cache
   clearHotCache();
 
-  // 3. Clear Supabase request_logs
+  // 3. Clear active rate limit windows
+  clearRateLimits();
+
+  // 4. Clear Supabase request_logs
   if (supabase) {
     try {
       await supabase
@@ -250,21 +260,25 @@ export async function seedDemoLogs(): Promise<void> {
 /**
  * Generates a new Virtual API Key
  */
-export async function createNewApiKey(name: string): Promise<{
+export async function createNewApiKey(
+  name: string,
+  rateLimitRpm: number = 60
+): Promise<{
   record: ApiKeyRecord;
   plainTextKey: string;
 }> {
-  const randomSecret = crypto.randomBytes(16).toString('hex');
-  const plainTextKey = `devv_live_${randomSecret}`;
+  const publicId = crypto.randomBytes(4).toString('hex'); // 8 hex chars
+  const randomSecret = crypto.randomBytes(16).toString('hex'); // 32 hex chars
+  const plainTextKey = `devv_live_${publicId}_${randomSecret}`;
   const keyHash = crypto.createHash('sha256').update(plainTextKey).digest('hex');
-  const prefix = `devv_live_${randomSecret.slice(0, 4)}...`;
+  const prefix = `devv_live_${publicId}...`;
 
   const record: ApiKeyRecord = {
     id: crypto.randomUUID(),
     name: name || 'API Key',
     key_hash: keyHash,
     prefix,
-    rate_limit_rpm: 60,
+    rate_limit_rpm: rateLimitRpm,
     is_active: true,
     created_at: new Date().toISOString(),
   };

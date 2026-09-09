@@ -49,6 +49,65 @@ export function SecuritySandbox({
   const [lastRawPromptSent, setLastRawPromptSent] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [executionStopwatch, setExecutionStopwatch] = useState<number>(0);
+  const [isSpamming, setIsSpamming] = useState<boolean>(false);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    remaining: string;
+    limit: string;
+    reset: string;
+  } | null>(null);
+
+  const handleTestRateLimit = async () => {
+    if (isLoading || isSpamming) return;
+    setIsSpamming(true);
+    setErrorMsg(null);
+
+    try {
+      for (let i = 1; i <= 6; i++) {
+        const res = await fetch('/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${activeKeyToken}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: `Rate limit burst #${i}` }],
+          }),
+        });
+
+        const limitHeader = res.headers.get('x-ratelimit-limit-requests');
+        const remainingHeader = res.headers.get('x-ratelimit-remaining-requests');
+        const resetHeader = res.headers.get('x-ratelimit-reset-requests');
+
+        if (limitHeader && remainingHeader) {
+          setRateLimitInfo({
+            limit: limitHeader,
+            remaining: remainingHeader,
+            reset: resetHeader || '60',
+          });
+        }
+
+        if (res.status === 429) {
+          const errData = await res.json().catch(() => ({}));
+          const retryAfter = res.headers.get('retry-after') || '15';
+          setErrorMsg(
+            `Rate Limit Throttled (HTTP 429): ${
+              errData?.error?.message || 'Quota exceeded'
+            }. Retry-After: ${retryAfter}s.`
+          );
+          break;
+        } else if (res.ok) {
+          const data = await res.json();
+          setLastResponse(data);
+        }
+      }
+      onExecutionComplete?.();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Rate limit test failed');
+    } finally {
+      setIsSpamming(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!prompt.trim() || isLoading) return;
@@ -80,8 +139,26 @@ export function SecuritySandbox({
       clearInterval(interval);
       setExecutionStopwatch(Date.now() - start);
 
+      const limitHeader = res.headers.get('x-ratelimit-limit-requests');
+      const remainingHeader = res.headers.get('x-ratelimit-remaining-requests');
+      const resetHeader = res.headers.get('x-ratelimit-reset-requests');
+
+      if (limitHeader && remainingHeader) {
+        setRateLimitInfo({
+          limit: limitHeader,
+          remaining: remainingHeader,
+          reset: resetHeader || '60',
+        });
+      }
+
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
+        if (res.status === 429) {
+          const retryAfter = res.headers.get('retry-after') || '15';
+          throw new Error(
+            `Rate Limit Throttled (HTTP 429): ${errJson?.error?.message || 'Quota exceeded'}. Retry-After: ${retryAfter}s.`
+          );
+        }
         throw new Error(errJson?.error?.message || `HTTP ${res.status}`);
       }
 
@@ -283,6 +360,14 @@ export function SecuritySandbox({
                 <span className="text-zinc-400">
                   Provider: <strong className="text-emerald-400 uppercase">{lastResponse._devv.provider}</strong>
                 </span>
+                {rateLimitInfo && (
+                  <>
+                    <span className="text-zinc-600">|</span>
+                    <span className="text-zinc-400">
+                      Rate Limit: <strong className="text-emerald-400">{rateLimitInfo.remaining}/{rateLimitInfo.limit} RPM</strong>
+                    </span>
+                  </>
+                )}
               </div>
               <div className="text-emerald-400 font-semibold">
                 {lastResponse._devv.cache_hit
@@ -296,28 +381,40 @@ export function SecuritySandbox({
 
       {/* Controls Bar */}
       <div className="px-5 py-3.5 bg-surface-0 border-t border-border-subtle flex flex-wrap items-center justify-between gap-4">
-        {/* Outage Simulation Switch */}
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={simulateOutage}
-            onChange={(e) => setSimulateOutage(e.target.checked)}
-            className="w-4 h-4 rounded bg-surface-2 border-border-subtle text-primary focus:ring-primary focus:ring-offset-surface-0 cursor-pointer"
-          />
-          <span className="text-xs font-mono text-zinc-300">
-            Simulate Upstream 429 Outage (Test Auto-Failover)
-          </span>
-          {simulateOutage && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Active
+        {/* Outage Simulation Switch & Rate Limit Burst Button */}
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={simulateOutage}
+              onChange={(e) => setSimulateOutage(e.target.checked)}
+              className="w-4 h-4 rounded bg-surface-2 border-border-subtle text-primary focus:ring-primary focus:ring-offset-surface-0 cursor-pointer"
+            />
+            <span className="text-xs font-mono text-zinc-300">
+              Simulate Upstream Outage (Auto-Failover)
             </span>
-          )}
-        </label>
+            {simulateOutage && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Active
+              </span>
+            )}
+          </label>
+
+          <button
+            onClick={handleTestRateLimit}
+            disabled={isLoading || isSpamming}
+            className="px-3 py-1 rounded bg-surface-2 hover:bg-zinc-800 border border-border-subtle text-xs font-mono text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-50"
+            title="Fires rapid burst requests to test HTTP 429 rate limit enforcement"
+          >
+            <Zap className={`w-3.5 h-3.5 text-amber-400 ${isSpamming ? 'animate-pulse' : ''}`} />
+            <span>{isSpamming ? 'Bursting...' : 'Test Rate Limiter'}</span>
+          </button>
+        </div>
 
         {/* Action Button */}
         <button
           onClick={handleSend}
-          disabled={isLoading || !prompt.trim()}
+          disabled={isLoading || isSpamming || !prompt.trim()}
           className="flex items-center gap-2 px-5 py-2 rounded-md bg-primary hover:bg-primary-bright text-black font-mono font-bold text-xs hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? (
