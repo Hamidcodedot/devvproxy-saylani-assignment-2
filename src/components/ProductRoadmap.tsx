@@ -41,6 +41,7 @@ const PHASES: MilestonePhase[] = [
       { text: 'Deterministic SHA-256 0ms Cache (100% Token Savings)', done: true },
       { text: 'Multi-Provider Failover (OpenAI ➔ Groq / Compound-Mini)', done: true },
       { text: 'Live Supabase PostgreSQL Telemetry & Audit Logs', done: true },
+      { text: 'In-Memory Sliding-Window Rate Limiter (< 0.05ms Overhead)', done: true },
       { text: '1-Click Evaluator Mode with Instant Demo Credentials', done: true },
     ],
   },
@@ -169,12 +170,14 @@ export function ProductRoadmap() {
 
               <div className="pt-4 border-t border-border-subtle/70">
                 {isLive ? (
-                  <span className="text-[11px] font-mono text-emerald-400 font-semibold block text-center">
-                    ✓ Deployed & Verified Live
+                  <span className="text-[11px] font-mono text-emerald-400 font-semibold flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Deployed & Verified Live</span>
                   </span>
                 ) : isProgress ? (
-                  <span className="text-[11px] font-mono text-primary font-semibold block text-center">
-                    ⏳ Scheduled for v1.1
+                  <span className="text-[11px] font-mono text-primary font-semibold flex items-center justify-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Scheduled for v1.1</span>
                   </span>
                 ) : (
                   <span className="text-[11px] font-mono text-zinc-500 block text-center">
