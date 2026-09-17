@@ -387,7 +387,7 @@ export default function HomePage() {
               </div>
 
               {/* Terminal Body */}
-              <div className="p-4 bg-[#0c0c0e]">
+              <div className="p-4 bg-surface-editor">
                 {heroTerminalTab === 'request' ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-[10px] text-zinc-500 border-b border-border-subtle/50 pb-1.5">

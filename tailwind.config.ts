@@ -10,17 +10,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#09090b", // Pure dark matte background (zinc-950)
+        background: "#141417", // Elevated charcoal dark grey (soft on eyes, replaces harsh black)
         surface: {
-          0: "#09090b",
-          1: "#121215", // Solid matte surface
-          2: "#18181b", // Slightly elevated container (zinc-900)
-          3: "#27272a", // Borders & active states (zinc-800)
-          editor: "#0c0c0e", // Editor panel
+          0: "#141417",
+          1: "#1a1b20", // Refined dark grey card surface
+          2: "#22232a", // Elevated containers & pill buttons
+          3: "#2e303a", // Active borders & chips
+          editor: "#16171c", // Terminal editor background
         },
         border: {
-          subtle: "#27272a", // Crisp zinc-800 border
-          active: "#3f3f46", // zinc-700
+          subtle: "#272932", // Crisp subtle hairline border
+          active: "#3e414f", // Refined active border
         },
         primary: {
           DEFAULT: "#10b981", // Crisp emerald accent
