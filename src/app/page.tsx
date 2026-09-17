@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Shield,
@@ -119,6 +119,13 @@ const FAQS = [
   },
 ];
 
+const ROTATING_TERMS = [
+  'Cost Firewall',
+  'PII Data Shield',
+  '0ms Cache Layer',
+  'Outage Router',
+];
+
 export default function HomePage() {
   const [activeLang, setActiveLang] = useState<CodeLang>('python');
   const [copiedSnippet, setCopiedSnippet] = useState(false);
@@ -127,6 +134,14 @@ export default function HomePage() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [heroTerminalTab, setHeroTerminalTab] = useState<'request' | 'response'>('request');
   const [isSimulatingWire, setIsSimulatingWire] = useState(false);
+  const [currentTermIndex, setCurrentTermIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTermIndex((prev) => (prev + 1) % ROTATING_TERMS.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   const quickstartCommand = `curl -X POST https://devvproxy.vercel.app/api/v1/chat/completions \\
   -H "Authorization: Bearer devv_live_demo_9481b37c" \\
@@ -281,7 +296,21 @@ export default function HomePage() {
           </div>
 
           <h1 id="hero-title" className="text-4xl sm:text-6xl font-bold tracking-tight text-white leading-[1.15]">
-            The Privacy-First AI Gateway & Cost Firewall
+            <span>The Privacy-First AI Gateway</span>
+            <br className="hidden sm:inline" />
+            <span className="text-zinc-400"> &amp; </span>
+            <span className="inline-flex items-center text-emerald-400">
+              <span
+                key={currentTermIndex}
+                className="inline-block animate-in fade-in slide-in-from-bottom-2 duration-300 font-extrabold tracking-tight"
+              >
+                {ROTATING_TERMS[currentTermIndex]}
+              </span>
+              <span
+                aria-hidden="true"
+                className="inline-block w-[3px] sm:w-[4px] h-[0.75em] bg-emerald-400 ml-2 align-middle animate-pulse rounded-full"
+              />
+            </span>
           </h1>
 
           <p className="text-base sm:text-lg text-zinc-400 font-sans leading-relaxed max-w-2xl mx-auto">
