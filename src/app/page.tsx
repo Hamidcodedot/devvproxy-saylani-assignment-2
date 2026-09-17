@@ -125,6 +125,8 @@ export default function HomePage() {
   const [copiedQuickstart, setCopiedQuickstart] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [heroTerminalTab, setHeroTerminalTab] = useState<'request' | 'response'>('request');
+  const [isSimulatingWire, setIsSimulatingWire] = useState(false);
 
   const quickstartCommand = `curl -X POST https://devvproxy.vercel.app/api/v1/chat/completions \\
   -H "Authorization: Bearer devv_live_demo_9481b37c" \\
@@ -143,10 +145,22 @@ export default function HomePage() {
     setTimeout(() => setCopiedQuickstart(false), 2000);
   };
 
+  const handleSimulateWire = () => {
+    setIsSimulatingWire(true);
+    setTimeout(() => {
+      setIsSimulatingWire(false);
+      setHeroTerminalTab('response');
+    }, 400);
+  };
+
   return (
-    <div className="min-h-screen bg-background text-[#f4f4f5] flex flex-col font-sans selection:bg-primary/20 selection:text-primary">
+    <div className="min-h-screen bg-background text-[#f4f4f5] flex flex-col font-sans selection:bg-primary/20 selection:text-primary relative overflow-x-hidden">
+      {/* Ambient Blueprint Grid & Soft Emerald Halo */}
+      <div className="absolute inset-0 bg-blueprint-grid mask-radial-fade pointer-events-none -z-10 h-[960px]" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-500/10 via-emerald-500/2 to-transparent blur-3xl pointer-events-none -z-10" />
+
       {/* Top Navigation */}
-      <header className="border-b border-border-subtle bg-surface-0/90 backdrop-blur-md px-4 sm:px-8 h-16 flex items-center justify-between sticky top-0 z-50">
+      <header className="border-b border-border-subtle bg-surface-0/80 backdrop-blur-md px-4 sm:px-8 h-16 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2.5 group">
             <div className="h-8 w-8 rounded bg-surface-2 border border-border-subtle flex items-center justify-center text-primary group-hover:border-primary/50 transition-colors">
@@ -296,34 +310,127 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Quickstart 1-Click Copyable Command */}
-          <div className="pt-4 max-w-2xl mx-auto text-left font-mono text-xs">
-            <div className="p-3.5 rounded-lg bg-surface-editor border border-border-subtle space-y-2">
-              <div className="flex items-center justify-between text-[11px] text-zinc-500 border-b border-border-subtle pb-2">
-                <span className="flex items-center gap-1.5">
-                  <Terminal className="w-3.5 h-3.5 text-primary" />
-                  <span>Instant cURL Wire Test (No Signup Required)</span>
-                </span>
-                <button
-                  onClick={handleCopyQuickstart}
-                  className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors active:scale-95"
-                >
-                  {copiedQuickstart ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400 font-semibold">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy cURL</span>
-                    </>
-                  )}
-                </button>
+          {/* Interactive Floating Developer Console Window */}
+          <div className="pt-6 max-w-2xl mx-auto text-left font-mono text-xs">
+            <div className="rounded-xl bg-surface-1/90 backdrop-blur-md border border-border-subtle shadow-2xl overflow-hidden hover:border-zinc-700 transition-all">
+              {/* Window Titlebar */}
+              <div className="px-4 py-2.5 bg-surface-2/80 border-b border-border-subtle flex flex-wrap items-center justify-between gap-2">
+                {/* Window Dots & Tabs */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5" aria-hidden="true">
+                    <span className="w-2.5 h-2.5 rounded-full bg-zinc-700/80 inline-block"></span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-zinc-700/80 inline-block"></span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-zinc-700/80 inline-block"></span>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-surface-0/60 p-0.5 rounded-md border border-border-subtle text-[11px]">
+                    <button
+                      onClick={() => setHeroTerminalTab('request')}
+                      className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1.5 ${
+                        heroTerminalTab === 'request'
+                          ? 'bg-surface-2 text-white font-semibold shadow-xs'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Terminal className="w-3 h-3 text-primary" />
+                      <span>wire-request.sh</span>
+                    </button>
+                    <button
+                      onClick={() => setHeroTerminalTab('response')}
+                      className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1.5 ${
+                        heroTerminalTab === 'response'
+                          ? 'bg-surface-2 text-white font-semibold shadow-xs'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Shield className="w-3 h-3 text-emerald-400" />
+                      <span>edge-response.json</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Indicator & Action Buttons */}
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>200 OK • 0ms Cache Hit</span>
+                  </span>
+
+                  <button
+                    onClick={handleSimulateWire}
+                    disabled={isSimulatingWire}
+                    title="Simulate DevvProxy edge request inspection"
+                    className="px-2.5 py-1 rounded bg-primary/10 hover:bg-primary/20 text-emerald-400 border border-primary/30 flex items-center gap-1 font-semibold active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSimulatingWire ? 'animate-spin' : ''}`} />
+                    <span>{isSimulatingWire ? 'Sending...' : 'Run Test'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleCopyQuickstart}
+                    title="Copy command to clipboard"
+                    className="p-1 sm:px-2 sm:py-1 rounded bg-surface-0 hover:bg-surface-1 border border-border-subtle text-zinc-400 hover:text-white flex items-center gap-1 transition-colors active:scale-95"
+                  >
+                    {copiedQuickstart ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="hidden sm:inline text-emerald-400 font-semibold">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span className="hidden sm:inline">Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-              <pre className="text-zinc-300 text-[11px] overflow-x-auto whitespace-pre leading-relaxed py-1">
-                <code>{quickstartCommand}</code>
-              </pre>
+
+              {/* Terminal Body */}
+              <div className="p-4 bg-[#0c0c0e]">
+                {heroTerminalTab === 'request' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px] text-zinc-500 border-b border-border-subtle/50 pb-1.5">
+                      <span>CLIENT WIRE REQUEST • ZERO SDK REWRITE</span>
+                      <span className="text-zinc-500">HTTP/1.1 POST</span>
+                    </div>
+                    <pre className="text-zinc-300 text-[11px] overflow-x-auto whitespace-pre leading-relaxed py-1">
+                      <code>{quickstartCommand}</code>
+                    </pre>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px] text-zinc-500 border-b border-border-subtle/50 pb-1.5">
+                      <span className="text-emerald-400 font-semibold">EDGE PROXY INSPECTION TELEMETRY</span>
+                      <span className="text-zinc-400">Deterministic SHA-256 Hit</span>
+                    </div>
+                    <pre className="text-emerald-300/90 text-[11px] overflow-x-auto whitespace-pre leading-relaxed py-1">
+                      <code>{`{
+  "id": "chatcmpl-devv_live_demo_9481b37c",
+  "object": "chat.completion",
+  "created": 1740000000,
+  "model": "gpt-4o-mini",
+  "x_devv_telemetry": {
+    "cache": "HIT (0ms)",
+    "tokens_saved": 48,
+    "pii_scrubbed": [
+      { "type": "CREDIT_CARD", "luhn": true, "mask": "[CREDIT_CARD]" },
+      { "type": "EMAIL", "mask": "[EMAIL]" }
+    ],
+    "failover_ready": true,
+    "rate_limit_remaining": "59/60 RPM"
+  },
+  "choices": [{
+    "message": {
+      "role": "assistant",
+      "content": "Hello! DevvProxy verified your request: PII stripped at edge, 0ms cache active."
+    }
+  }]
+}`}</code>
+                    </pre>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>

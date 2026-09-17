@@ -40,3 +40,14 @@ input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: #52525b;
 }
+
+/* Technical Blueprint Grid & Ambient Mask */
+.bg-blueprint-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.mask-radial-fade {
+  mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, black 35%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, black 35%, transparent 85%);
+}
