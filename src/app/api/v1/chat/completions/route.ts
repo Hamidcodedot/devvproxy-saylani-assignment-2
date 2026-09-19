@@ -6,7 +6,9 @@ import {
   getHotCacheEntry,
   setHotCacheEntry,
   calculateCostSavings,
+  getRemainingTtlSeconds,
 } from '@/lib/cache-engine';
+import { evaluateCachePolicy } from '@/lib/cache-policy';
 import { dispatchCompletion } from '@/lib/proxy-router';
 import { ChatCompletionRequest, ChatCompletionResponse } from '@/types';
 import {
@@ -100,7 +102,80 @@ export async function POST(req: NextRequest) {
     // 3. PII Redaction Pipeline (Edge Sanitization)
     const { sanitizedMessages, totalPiiCount, detectedTypes } = scrubMessages(body.messages);
 
-    // 4. Deterministic Cache Lookup
+    // 4. Edge Cache Policy Evaluation (Volatility Detection & Client Directives)
+    const cachePolicy = evaluateCachePolicy(body.messages, req.headers);
+
+    // Prepare upstream sanitized payload
+    const sanitizedPayload: ChatCompletionRequest = {
+      ...body,
+      model,
+      messages: sanitizedMessages,
+    };
+
+    // ============================================================================
+    // CASE A: CACHE BYPASS (Volatile Real-Time Query or Explicit Client Directive)
+    // ============================================================================
+    if (cachePolicy.action === 'BYPASS') {
+      const dispatchResult = await dispatchCompletion(
+        sanitizedPayload,
+        ephemeralUpstreamKey,
+        body.simulate_outage
+      );
+
+      const latencyMs = dispatchResult.latencyMs;
+      const totalTokens = dispatchResult.response.usage?.total_tokens || 0;
+      const estimatedCost = calculateCostSavings(totalTokens, model);
+
+      const enrichedResponse: ChatCompletionResponse = {
+        ...dispatchResult.response,
+        _devv: {
+          cache_hit: false,
+          cache_policy: cachePolicy.policyType,
+          cache_bypass_reason: cachePolicy.reason,
+          provider: dispatchResult.provider,
+          pii_scrubbed_count: totalPiiCount,
+          pii_types: detectedTypes,
+          latency_ms: latencyMs,
+          cost_saved_usd: 0,
+        },
+      };
+
+      // Non-blocking telemetry logging via Next.js 15 after()
+      after(async () => {
+        await recordRequestLog({
+          key_id: keyRecord.id,
+          model,
+          upstream_provider: dispatchResult.provider,
+          prompt_tokens: dispatchResult.response.usage?.prompt_tokens || 0,
+          completion_tokens: dispatchResult.response.usage?.completion_tokens || 0,
+          total_tokens: totalTokens,
+          latency_ms: latencyMs,
+          cache_hit: false,
+          pii_scrubbed_count: totalPiiCount,
+          pii_types_detected: detectedTypes,
+          estimated_cost_usd: estimatedCost,
+          cost_saved_usd: 0,
+          status_code: 200,
+        });
+      });
+
+      return NextResponse.json(enrichedResponse, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Devv-Cache': 'BYPASS',
+          'X-Devv-Cache-Policy': cachePolicy.policyType,
+          'X-Devv-Cache-Bypass-Reason': cachePolicy.reason || 'volatile_detected',
+          'X-Devv-Provider': dispatchResult.provider,
+          'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
+          ...rateLimitHeaders,
+        },
+      });
+    }
+
+    // ============================================================================
+    // CASE B: INVARIANT CACHE LOOKUP (Deterministic SHA-256 with Dynamic TTL)
+    // ============================================================================
     const cacheKey = generateCacheKey({
       keyId: keyRecord.id,
       model,
@@ -117,18 +192,18 @@ export async function POST(req: NextRequest) {
 
     const cachedEntry = getHotCacheEntry(cacheKey);
 
-    // ============================================================================
-    // CASE A: CACHE HIT (< 20ms, $0.00 cost, 100% token savings)
-    // ============================================================================
+    // SUB-CASE B1: CACHE HIT (< 20ms, $0.00 cost, 100% token savings)
     if (cachedEntry) {
       const latencyMs = Date.now() - startTime;
       const tokensSaved = cachedEntry.tokens_saved || 0;
       const costSaved = calculateCostSavings(tokensSaved, model);
+      const remainingTtl = getRemainingTtlSeconds(cachedEntry);
 
       const cachedResponse: ChatCompletionResponse = {
         ...cachedEntry.response_body,
         _devv: {
           cache_hit: true,
+          cache_policy: cachedEntry.policy_type || 'static',
           provider: 'cache',
           pii_scrubbed_count: totalPiiCount,
           pii_types: detectedTypes,
@@ -161,6 +236,8 @@ export async function POST(req: NextRequest) {
         headers: {
           'Content-Type': 'application/json',
           'X-Devv-Cache': 'HIT',
+          'X-Devv-Cache-Policy': cachedEntry.policy_type || 'static',
+          'X-Devv-Cache-Expires-In': `${remainingTtl}s`,
           'X-Devv-Provider': 'cache',
           'X-Devv-Latency-Saved-Ms': `${Math.max(0, 420 - latencyMs)}`,
           'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
@@ -169,15 +246,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ============================================================================
-    // CASE B: CACHE MISS (Dispatch sanitized payload to Upstream Provider with Failover)
-    // ============================================================================
-    const sanitizedPayload: ChatCompletionRequest = {
-      ...body,
-      model,
-      messages: sanitizedMessages,
-    };
-
+    // SUB-CASE B2: CACHE MISS (Dispatch to Upstream Provider & Store with Evaluated TTL)
     const dispatchResult = await dispatchCompletion(
       sanitizedPayload,
       ephemeralUpstreamKey,
@@ -188,13 +257,22 @@ export async function POST(req: NextRequest) {
     const totalTokens = dispatchResult.response.usage?.total_tokens || 0;
     const estimatedCost = calculateCostSavings(totalTokens, model);
 
-    // Populate L1 Hot Cache
-    setHotCacheEntry(cacheKey, keyRecord.id, model, dispatchResult.response, totalTokens);
+    // Populate L1 Hot Cache with dynamic policy TTL
+    setHotCacheEntry(
+      cacheKey,
+      keyRecord.id,
+      model,
+      dispatchResult.response,
+      totalTokens,
+      cachePolicy.ttlSeconds,
+      cachePolicy.policyType
+    );
 
     const enrichedResponse: ChatCompletionResponse = {
       ...dispatchResult.response,
       _devv: {
         cache_hit: false,
+        cache_policy: cachePolicy.policyType,
         provider: dispatchResult.provider,
         pii_scrubbed_count: totalPiiCount,
         pii_types: detectedTypes,
@@ -227,6 +305,8 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'X-Devv-Cache': 'MISS',
+        'X-Devv-Cache-Policy': cachePolicy.policyType,
+        'X-Devv-Cache-TTL': `${cachePolicy.ttlSeconds}s`,
         'X-Devv-Provider': dispatchResult.provider,
         'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
         ...rateLimitHeaders,

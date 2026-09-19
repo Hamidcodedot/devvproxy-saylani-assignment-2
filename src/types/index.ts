@@ -1,5 +1,14 @@
 export type PiiType = 'EMAIL' | 'CREDIT_CARD' | 'SSN' | 'PHONE' | 'SECRET_KEY';
 
+export type CachePolicyType = 'static' | 'dynamic' | 'volatile' | 'client_override';
+
+export interface CachePolicyDecision {
+  action: 'CACHE' | 'BYPASS';
+  policyType: CachePolicyType;
+  ttlSeconds: number;
+  reason?: string;
+}
+
 export interface PiiRedactionResult {
   sanitizedText: string;
   count: number;
@@ -44,6 +53,8 @@ export interface ChatCompletionResponse {
   usage: ChatCompletionUsage;
   _devv?: {
     cache_hit: boolean;
+    cache_policy?: CachePolicyType;
+    cache_bypass_reason?: string;
     provider: 'cache' | 'openai' | 'groq' | 'simulator';
     pii_scrubbed_count: number;
     pii_types: PiiType[];
@@ -70,6 +81,8 @@ export interface CacheEntry {
   response_body: ChatCompletionResponse;
   tokens_saved: number;
   hit_count: number;
+  policy_type?: CachePolicyType;
+  ttl_seconds?: number;
   created_at: string;
   last_accessed_at: string;
   expires_at: string;

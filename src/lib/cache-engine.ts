@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { ChatMessage, ChatCompletionResponse, CacheEntry } from '@/types';
+import { ChatMessage, ChatCompletionResponse, CacheEntry, CachePolicyType } from '@/types';
 
 // In-Memory Hot Cache Store (L1 cache for sub-millisecond lookups)
 const hotCache = new Map<string, CacheEntry>();
@@ -90,14 +90,16 @@ export function getHotCacheEntry(cacheHash: string): CacheEntry | null {
 }
 
 /**
- * Stores response in the hot cache
+ * Stores response in the hot cache with dynamic policy-driven TTL
  */
 export function setHotCacheEntry(
   cacheHash: string,
   keyId: string,
   model: string,
   response: ChatCompletionResponse,
-  tokensSaved: number
+  tokensSaved: number,
+  customTtlSeconds?: number,
+  policyType: CachePolicyType = 'static'
 ): CacheEntry {
   // Evict oldest if full
   if (hotCache.size >= MAX_HOT_CACHE_ITEMS) {
@@ -106,7 +108,8 @@ export function setHotCacheEntry(
   }
 
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days
+  const ttlSeconds = customTtlSeconds && customTtlSeconds > 0 ? customTtlSeconds : 30 * 24 * 60 * 60; // 30 days default
+  const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
 
   const entry: CacheEntry = {
     cache_hash: cacheHash,
@@ -115,6 +118,8 @@ export function setHotCacheEntry(
     response_body: response,
     tokens_saved: tokensSaved,
     hit_count: 1,
+    policy_type: policyType,
+    ttl_seconds: ttlSeconds,
     created_at: now.toISOString(),
     last_accessed_at: now.toISOString(),
     expires_at: expiresAt.toISOString(),
@@ -122,6 +127,14 @@ export function setHotCacheEntry(
 
   hotCache.set(cacheHash, entry);
   return entry;
+}
+
+/**
+ * Returns the remaining TTL in seconds for a cached entry
+ */
+export function getRemainingTtlSeconds(entry: CacheEntry): number {
+  const remainingMs = new Date(entry.expires_at).getTime() - Date.now();
+  return Math.max(0, Math.floor(remainingMs / 1000));
 }
 
 /**
