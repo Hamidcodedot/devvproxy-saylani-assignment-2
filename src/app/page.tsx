@@ -24,7 +24,7 @@ import {
 import { ArchitectureVisualizer } from '@/components/ArchitectureVisualizer';
 import { ProductRoadmap } from '@/components/ProductRoadmap';
 
-type CodeLang = 'python' | 'typescript' | 'curl';
+type CodeLang = 'python' | 'typescript' | 'agent' | 'curl';
 
 interface CodeExample {
   title: string;
@@ -76,6 +76,31 @@ const openai = new OpenAI({
 // - Edge PII Sanitization Active
 // - 0ms Deterministic Cache Active
 // - Automatic Failover to Groq / LLaMA`,
+  },
+  agent: {
+    title: 'Autonomous Agents (CrewAI / LangGraph)',
+    before: `from crewai import Agent, LLM
+
+# Standard Agent (vulnerable to infinite loops)
+llm = LLM(
+    model="gpt-4o-mini",
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+# Risks:
+# - Runaway ReAct loop drains $500 overnight
+# - Stale cache poisons agent state machine`,
+    after: `from crewai import Agent, LLM
+
+# Protected Agent with DevvProxy
+llm = LLM(
+    model="gpt-4o-mini",
+    base_url="https://devvproxy.vercel.app/api/v1",
+    api_key=os.getenv("DEVVPROXY_API_KEY")
+)
+# Protections:
+# - Anti-Runaway Loop Circuit Breaker Active
+# - Volatility Shield (0s TTL on live data)
+# - Intercepts recursion before wallet drain`,
   },
   curl: {
     title: 'cURL / Direct HTTP Wire Protocol',
@@ -500,18 +525,24 @@ export default function HomePage() {
             </div>
 
             {/* Language Selector Tabs */}
-            <div className="flex items-center gap-1.5 font-mono text-xs bg-surface-0 p-1 rounded-lg border border-border-subtle self-start sm:self-auto">
-              {(['python', 'typescript', 'curl'] as CodeLang[]).map((lang) => (
+            <div className="flex items-center gap-1.5 font-mono text-xs bg-surface-0 p-1 rounded-lg border border-border-subtle self-start sm:self-auto overflow-x-auto max-w-full">
+              {(['python', 'typescript', 'agent', 'curl'] as CodeLang[]).map((lang) => (
                 <button
                   key={lang}
                   onClick={() => setActiveLang(lang)}
-                  className={`px-3 py-1 rounded transition-all ${
+                  className={`px-3 py-1 rounded transition-all whitespace-nowrap ${
                     activeLang === lang
                       ? 'bg-surface-2 text-white font-bold border border-border-subtle shadow-sm'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
-                  {lang === 'python' ? 'Python' : lang === 'typescript' ? 'TypeScript' : 'cURL'}
+                  {lang === 'python'
+                    ? 'Python'
+                    : lang === 'typescript'
+                    ? 'TypeScript'
+                    : lang === 'agent'
+                    ? 'Agents (CrewAI)'
+                    : 'cURL'}
                 </button>
               ))}
             </div>
@@ -590,19 +621,20 @@ export default function HomePage() {
                   <div className="h-9 w-9 rounded-lg bg-surface-2 border border-border-subtle flex items-center justify-center text-primary">
                     <Gauge className="w-4 h-4" />
                   </div>
-                  <span className="px-2 py-0.5 rounded bg-surface-2 border border-border-subtle text-[10px] font-mono text-emerald-400 font-semibold">
-                    &lt; 0.05ms Overhead
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400 font-semibold">
+                    Circuit Breaker Active
                   </span>
                 </div>
                 <h3 className="text-base font-bold font-mono text-white">
                   Runaway Loops &amp; Bill Shock Defense
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                  Agentic recursion or tool-calling loops can drain your OpenAI credits in minutes. Our in-memory sliding window rate limiter halts loops at the edge before you wake up to a $1,000 billing surprise.
+                  Autonomous agent recursion (LangGraph, CrewAI) can burn your credit limit in minutes. Our edge Circuit Breaker detects rapid prompt loops in &lt;0.02ms, halting recursion on the 10th duplicate call with RFC 7807 diagnostics.
                 </p>
               </div>
-              <div className="pt-3 border-t border-border-subtle text-[11px] font-mono text-zinc-500">
-                Key-level RPM &amp; Client-IP Throttling
+              <div className="pt-3 border-t border-border-subtle text-[11px] font-mono text-zinc-500 flex items-center justify-between">
+                <span>Sliding-Window Loop Interception</span>
+                <span className="text-emerald-400">0ms Overhead</span>
               </div>
             </div>
 
