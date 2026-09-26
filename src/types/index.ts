@@ -117,3 +117,23 @@ export interface DashboardStats {
   avgUpstreamLatencyMs: number;
   systemStatus: 'operational' | 'degraded' | 'maintenance';
 }
+
+export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
+export interface AgentLoopTracker {
+  state: CircuitBreakerState;
+  timestamps: number[];
+  trippedAt: number | null;
+  tripCount: number;
+}
+
+export interface CircuitBreakerResult {
+  tripped: boolean;
+  state: CircuitBreakerState;
+  loopCount: number;
+  threshold: number;
+  promptHash: string;
+  retryAfterSeconds: number;
+  estimatedCostSaved: string;
+  reason?: string;
+}

@@ -16,6 +16,11 @@ import {
   getRateLimitHeaders,
   formatRateLimitError,
 } from '@/lib/rate-limiter';
+import {
+  evaluateAgentCircuitBreaker,
+  formatCircuitBreakerError,
+  getCircuitBreakerHeaders,
+} from '@/lib/agent-circuit-breaker';
 
 // Enforce Node.js runtime for full crypto compatibility & long timeouts
 export const runtime = 'nodejs';
@@ -96,10 +101,52 @@ export async function POST(req: NextRequest) {
     const top_p = body.top_p ?? 1.0;
     const max_tokens = body.max_tokens;
 
+    // 3. Autonomous Agent Circuit Breaker (Anti-Runaway Loop Shield)
+    const circuitBreaker = evaluateAgentCircuitBreaker(
+      keyRecord.id,
+      body.messages,
+      req.headers
+    );
+
+    if (circuitBreaker.tripped) {
+      const errorBody = formatCircuitBreakerError(circuitBreaker);
+      const cbHeaders = getCircuitBreakerHeaders(circuitBreaker);
+
+      // Async record request log for analytics
+      after(async () => {
+        await recordRequestLog({
+          key_id: keyRecord.id,
+          model,
+          upstream_provider: 'cache',
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+          latency_ms: Date.now() - startTime,
+          cache_hit: false,
+          pii_scrubbed_count: 0,
+          pii_types_detected: [],
+          estimated_cost_usd: 0,
+          cost_saved_usd: parseFloat(circuitBreaker.estimatedCostSaved.replace('$', '')) || 0.16,
+          status_code: 429,
+        });
+      });
+
+      return NextResponse.json(errorBody, {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...rateLimitHeaders,
+          ...cbHeaders,
+        },
+      });
+    }
+
+    const circuitBreakerHeaders = getCircuitBreakerHeaders(circuitBreaker);
+
     // Optional Bring-Your-Own-Key passed ephemerally via header
     const ephemeralUpstreamKey = req.headers.get('x-devv-upstream-key') || undefined;
 
-    // 3. PII Redaction Pipeline (Edge Sanitization)
+    // 4. PII Redaction Pipeline (Edge Sanitization)
     const { sanitizedMessages, totalPiiCount, detectedTypes } = scrubMessages(body.messages);
 
     // 4. Edge Cache Policy Evaluation (Volatility Detection & Client Directives)
@@ -169,6 +216,7 @@ export async function POST(req: NextRequest) {
           'X-Devv-Provider': dispatchResult.provider,
           'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
           ...rateLimitHeaders,
+          ...circuitBreakerHeaders,
         },
       });
     }
@@ -242,6 +290,7 @@ export async function POST(req: NextRequest) {
           'X-Devv-Latency-Saved-Ms': `${Math.max(0, 420 - latencyMs)}`,
           'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
           ...rateLimitHeaders,
+          ...circuitBreakerHeaders,
         },
       });
     }
@@ -310,6 +359,7 @@ export async function POST(req: NextRequest) {
         'X-Devv-Provider': dispatchResult.provider,
         'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
         ...rateLimitHeaders,
+        ...circuitBreakerHeaders,
       },
     });
   } catch (error: any) {
