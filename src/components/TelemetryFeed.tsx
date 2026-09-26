@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Activity, RefreshCw, Zap, Shield, Database } from 'lucide-react';
+import { Activity, RefreshCw, Zap, Shield, Database, AlertTriangle } from 'lucide-react';
 import { RequestLog } from '@/types';
 
 interface TelemetryFeedProps {
@@ -95,7 +95,12 @@ export function TelemetryFeed({
 
                   {/* Upstream Provider */}
                   <td className="py-3 px-4 whitespace-nowrap">
-                    {log.upstream_provider === 'cache' ? (
+                    {log.status_code === 429 ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        INTERCEPTED
+                      </span>
+                    ) : log.upstream_provider === 'cache' ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
                         <Zap className="w-2.5 h-2.5" />
                         CACHE (0ms)
@@ -160,9 +165,19 @@ export function TelemetryFeed({
 
                   {/* Status Code */}
                   <td className="py-3 px-4 text-right whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-2 text-emerald-400 text-[10px] font-mono">
-                      {log.cache_hit ? 'HIT 200' : '200 OK'}
-                    </span>
+                    {log.status_code === 429 ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-mono font-bold">
+                        429 BLOCKED
+                      </span>
+                    ) : log.status_code >= 500 ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono">
+                        {log.status_code} ERR
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-2 text-emerald-400 text-[10px] font-mono">
+                        {log.cache_hit ? 'HIT 200' : '200 OK'}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))
