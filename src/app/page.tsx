@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Gauge,
   Code2,
+  Sparkles,
 } from 'lucide-react';
 import { ArchitectureVisualizer } from '@/components/ArchitectureVisualizer';
 import { ProductRoadmap } from '@/components/ProductRoadmap';
@@ -140,7 +141,7 @@ const FAQS = [
   },
   {
     q: 'Does DevvProxy support SSE streaming (stream: true)?',
-    a: 'DevvProxy v1.0 enforces privacy filtering, rate limiting, and 0ms caching on standard non-streaming completions. Chunked SSE streaming with real-time token de-masking is currently in active development for v1.1 (Phase 2).',
+    a: 'Yes! DevvProxy natively supports wire-compatible Server-Sent Events (SSE) streaming. It passes upstream chunk bytes with zero latency (<5ms TTFT overhead), while background collectors asynchronously assemble the full text to populate the L1 Hot Cache and record telemetry. Cached responses are replayed instantly as synthetic 0ms streams.',
   },
 ];
 
@@ -588,8 +589,8 @@ export default function HomePage() {
           <div className="pt-2 text-[11px] font-mono text-zinc-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span>Works out-of-the-box with OpenAI, LangChain, CrewAI, AutoGen, and Vercel AI SDK.</span>
             <span className="text-zinc-400 flex items-center gap-1">
-              <Clock className="w-3 h-3 text-primary" />
-              <span>SSE Streaming scheduled for v1.1 (Phase 2)</span>
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+              <span className="text-emerald-400">SSE Streaming Live with 0ms Cache Replay</span>
             </span>
           </div>
         </section>

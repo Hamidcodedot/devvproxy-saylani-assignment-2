@@ -9,7 +9,12 @@ import {
   getRemainingTtlSeconds,
 } from '@/lib/cache-engine';
 import { evaluateCachePolicy } from '@/lib/cache-policy';
-import { dispatchCompletion } from '@/lib/proxy-router';
+import { dispatchCompletion, dispatchStreamingCompletion } from '@/lib/proxy-router';
+import {
+  SSE_HEADERS,
+  createCachedStream,
+  createPassThroughCollectorStream,
+} from '@/lib/streaming';
 import { ChatCompletionRequest, ChatCompletionResponse } from '@/types';
 import {
   checkRateLimit,
@@ -82,19 +87,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Gracefully handle unsupported streaming in 48-hour MVP
-    if (body.stream) {
-      return NextResponse.json(
-        {
-          error: {
-            message:
-              'DevvProxy v1.0 currently enforces privacy & caching over standard non-streaming completions. Streaming is scheduled for v1.1.',
-            type: 'invalid_request_error',
-          },
-        },
-        { status: 400 }
-      );
-    }
+    // Support streaming completions (Phase 2 Step 3)
+    const isStreaming = Boolean(body.stream);
 
     const model = body.model || 'gpt-4o-mini';
     const temperature = body.temperature ?? 1.0;
@@ -163,6 +157,55 @@ export async function POST(req: NextRequest) {
     // CASE A: CACHE BYPASS (Volatile Real-Time Query or Explicit Client Directive)
     // ============================================================================
     if (cachePolicy.action === 'BYPASS') {
+      if (isStreaming) {
+        const dispatchResult = await dispatchStreamingCompletion(
+          sanitizedPayload,
+          ephemeralUpstreamKey,
+          body.simulate_outage
+        );
+
+        const latencyMs = dispatchResult.latencyMs;
+        const promptTokens = Math.max(1, Math.round(JSON.stringify(sanitizedMessages).length / 4));
+
+        const collectorStream = createPassThroughCollectorStream(
+          dispatchResult.stream,
+          async (assembledText, completionTokens) => {
+            const totalTokens = promptTokens + completionTokens;
+            const estimatedCost = calculateCostSavings(totalTokens, model);
+
+            await recordRequestLog({
+              key_id: keyRecord.id,
+              model,
+              upstream_provider: dispatchResult.provider,
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: totalTokens,
+              latency_ms: latencyMs,
+              cache_hit: false,
+              pii_scrubbed_count: totalPiiCount,
+              pii_types_detected: detectedTypes,
+              estimated_cost_usd: estimatedCost,
+              cost_saved_usd: 0,
+              status_code: 200,
+            });
+          }
+        );
+
+        return new Response(collectorStream, {
+          status: 200,
+          headers: {
+            ...SSE_HEADERS,
+            'X-Devv-Cache': 'BYPASS',
+            'X-Devv-Cache-Policy': cachePolicy.policyType,
+            'X-Devv-Cache-Bypass-Reason': cachePolicy.reason || 'volatile_detected',
+            'X-Devv-Provider': dispatchResult.provider,
+            'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
+            ...rateLimitHeaders,
+            ...circuitBreakerHeaders,
+          },
+        });
+      }
+
       const dispatchResult = await dispatchCompletion(
         sanitizedPayload,
         ephemeralUpstreamKey,
@@ -247,6 +290,43 @@ export async function POST(req: NextRequest) {
       const costSaved = calculateCostSavings(tokensSaved, model);
       const remainingTtl = getRemainingTtlSeconds(cachedEntry);
 
+      if (isStreaming) {
+        const cachedStream = createCachedStream(cachedEntry.response_body, model);
+
+        after(async () => {
+          await recordRequestLog({
+            key_id: keyRecord.id,
+            model,
+            upstream_provider: 'cache',
+            prompt_tokens: cachedEntry.response_body?.usage?.prompt_tokens || 0,
+            completion_tokens: cachedEntry.response_body?.usage?.completion_tokens || 0,
+            total_tokens: tokensSaved,
+            latency_ms: latencyMs,
+            cache_hit: true,
+            pii_scrubbed_count: totalPiiCount,
+            pii_types_detected: detectedTypes,
+            estimated_cost_usd: 0,
+            cost_saved_usd: costSaved,
+            status_code: 200,
+          });
+        });
+
+        return new Response(cachedStream, {
+          status: 200,
+          headers: {
+            ...SSE_HEADERS,
+            'X-Devv-Cache': 'HIT',
+            'X-Devv-Cache-Policy': cachedEntry.policy_type || 'static',
+            'X-Devv-Cache-Expires-In': `${remainingTtl}s`,
+            'X-Devv-Provider': 'cache',
+            'X-Devv-Latency-Saved-Ms': `${Math.max(0, 420 - latencyMs)}`,
+            'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
+            ...rateLimitHeaders,
+            ...circuitBreakerHeaders,
+          },
+        });
+      }
+
       const cachedResponse: ChatCompletionResponse = {
         ...cachedEntry.response_body,
         _devv: {
@@ -296,6 +376,89 @@ export async function POST(req: NextRequest) {
     }
 
     // SUB-CASE B2: CACHE MISS (Dispatch to Upstream Provider & Store with Evaluated TTL)
+    if (isStreaming) {
+      const dispatchResult = await dispatchStreamingCompletion(
+        sanitizedPayload,
+        ephemeralUpstreamKey,
+        body.simulate_outage
+      );
+
+      const latencyMs = dispatchResult.latencyMs;
+      const promptTokens = Math.max(1, Math.round(JSON.stringify(sanitizedMessages).length / 4));
+
+      const collectorStream = createPassThroughCollectorStream(
+        dispatchResult.stream,
+        async (assembledText, completionTokens) => {
+          const totalTokens = promptTokens + completionTokens;
+          const estimatedCost = calculateCostSavings(totalTokens, model);
+
+          const syntheticFullResponse: ChatCompletionResponse = {
+            id: `chatcmpl-stream-${Math.random().toString(36).substring(2, 9)}`,
+            object: 'chat.completion',
+            created: Math.floor(Date.now() / 1000),
+            model,
+            choices: [
+              {
+                index: 0,
+                message: {
+                  role: 'assistant',
+                  content: assembledText,
+                },
+                finish_reason: 'stop',
+              },
+            ],
+            usage: {
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+              total_tokens: totalTokens,
+            },
+          };
+
+          // Populate L1 Hot Cache with dynamic policy TTL
+          setHotCacheEntry(
+            cacheKey,
+            keyRecord.id,
+            model,
+            syntheticFullResponse,
+            totalTokens,
+            cachePolicy.ttlSeconds,
+            cachePolicy.policyType
+          );
+
+          // Non-blocking telemetry logging
+          await recordRequestLog({
+            key_id: keyRecord.id,
+            model,
+            upstream_provider: dispatchResult.provider,
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens: totalTokens,
+            latency_ms: latencyMs,
+            cache_hit: false,
+            pii_scrubbed_count: totalPiiCount,
+            pii_types_detected: detectedTypes,
+            estimated_cost_usd: estimatedCost,
+            cost_saved_usd: 0,
+            status_code: 200,
+          });
+        }
+      );
+
+      return new Response(collectorStream, {
+        status: 200,
+        headers: {
+          ...SSE_HEADERS,
+          'X-Devv-Cache': 'MISS',
+          'X-Devv-Cache-Policy': cachePolicy.policyType,
+          'X-Devv-Cache-TTL': `${cachePolicy.ttlSeconds}s`,
+          'X-Devv-Provider': dispatchResult.provider,
+          'X-Devv-PII-Scrubbed': `${totalPiiCount}`,
+          ...rateLimitHeaders,
+          ...circuitBreakerHeaders,
+        },
+      });
+    }
+
     const dispatchResult = await dispatchCompletion(
       sanitizedPayload,
       ephemeralUpstreamKey,

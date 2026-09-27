@@ -1,4 +1,5 @@
 import { ChatCompletionRequest, ChatCompletionResponse, ChatMessage } from '@/types';
+import { createMockSimulatorStream } from './streaming';
 
 // Map OpenAI / standard model identifiers to active Groq models
 const GROQ_MODEL_MAP: Record<string, string> = {
@@ -198,6 +199,149 @@ export async function dispatchCompletion(
     await new Promise((resolve) => setTimeout(resolve, 95)); // Realistic edge response time
     return {
       response: generateMockCompletion(payload.model, payload.messages, false),
+      provider: 'simulator',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+
+  throw new Error('All upstream AI providers unavailable. Please configure OPENAI_API_KEY or GROQ_API_KEY.');
+}
+
+export interface StreamingDispatchResult {
+  stream: ReadableStream<Uint8Array>;
+  provider: 'openai' | 'groq' | 'simulator';
+  latencyMs: number;
+}
+
+/**
+ * Dispatches an AI streaming completion request with automatic provider failover
+ */
+export async function dispatchStreamingCompletion(
+  payload: ChatCompletionRequest,
+  clientApiKey?: string,
+  simulateOutage = false
+): Promise<StreamingDispatchResult> {
+  const startTime = Date.now();
+  const openaiKey = clientApiKey || process.env.OPENAI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  const allowSimulator = process.env.DEVV_SIMULATOR_FALLBACK !== 'false';
+
+  const { simulate_outage: _unused, ...upstreamPayload } = payload as any;
+  const streamingPayload = {
+    ...upstreamPayload,
+    stream: true,
+  };
+
+  // 1. If explicit simulation of outage is requested (for demo toggle)
+  if (simulateOutage) {
+    if (groqKey) {
+      try {
+        const groqModel = GROQ_MODEL_MAP[payload.model] || 'groq/compound-mini';
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${groqKey}`,
+          },
+          body: JSON.stringify({
+            ...streamingPayload,
+            model: groqModel,
+          }),
+        });
+        if (res.ok && res.body) {
+          return {
+            stream: res.body as unknown as ReadableStream<Uint8Array>,
+            provider: 'groq',
+            latencyMs: Date.now() - startTime,
+          };
+        }
+      } catch {
+        // Fall through to simulator
+      }
+    }
+
+    return {
+      stream: createMockSimulatorStream(payload.model, payload.messages, true),
+      provider: 'simulator',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+
+  // 2. Primary Provider: OpenAI
+  if (openaiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), PRIMARY_TIMEOUT_MS);
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify(streamingPayload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok && res.body) {
+        return {
+          stream: res.body as unknown as ReadableStream<Uint8Array>,
+          provider: 'openai',
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      // Check if eligible for failover (429 Rate Limit, 5xx Server Error)
+      const isEligibleForFailover = res.status === 429 || res.status >= 500;
+      if (!isEligibleForFailover) {
+        const errorJson = await res.json().catch(() => ({ error: { message: `Upstream error ${res.status}` } }));
+        throw new Error(errorJson?.error?.message || `Upstream HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      if (err.message && !err.message.includes('abort') && !err.message.includes('429') && !err.message.includes('50')) {
+        throw err;
+      }
+    }
+  }
+
+  // 3. Failover Provider: Groq
+  if (groqKey) {
+    try {
+      const groqController = new AbortController();
+      const groqTimeout = setTimeout(() => groqController.abort(), 12000);
+      const groqModel = GROQ_MODEL_MAP[payload.model] || 'groq/compound-mini';
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${groqKey}`,
+        },
+        body: JSON.stringify({
+          ...streamingPayload,
+          model: groqModel,
+        }),
+        signal: groqController.signal,
+      });
+      clearTimeout(groqTimeout);
+
+      if (groqRes.ok && groqRes.body) {
+        return {
+          stream: groqRes.body as unknown as ReadableStream<Uint8Array>,
+          provider: 'groq',
+          latencyMs: Date.now() - startTime,
+        };
+      }
+    } catch {
+      // Continue to simulator
+    }
+  }
+
+  // 4. Ultimate Resilience: Mock Simulator
+  if (allowSimulator) {
+    return {
+      stream: createMockSimulatorStream(payload.model, payload.messages, false),
       provider: 'simulator',
       latencyMs: Date.now() - startTime,
     };

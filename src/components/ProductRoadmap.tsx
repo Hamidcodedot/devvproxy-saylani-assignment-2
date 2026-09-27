@@ -56,7 +56,7 @@ const PHASES: MilestonePhase[] = [
     items: [
       { text: 'Smart Volatility Classifier & Dynamic TTL (RFC Cache-Control)', done: true },
       { text: 'Autonomous Agent Runaway Loop Circuit Breaker', done: true },
-      { text: 'Chunked SSE Streaming De-masking (stream: true support)', done: false },
+      { text: 'Chunked SSE Streaming Pass-Through & 0ms Cache Replay', done: true },
       { text: 'Automated Stripe & Safepay Subscription Webhooks', done: false },
       { text: 'Custom Regex Pattern Rule Builder in Dashboard', done: false },
       { text: 'Virtual Key Quota Limits & Spend Alert Webhooks', done: false },
