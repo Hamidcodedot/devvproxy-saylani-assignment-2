@@ -10,7 +10,7 @@ import { TelemetryFeed } from '@/components/TelemetryFeed';
 import { QuickStart } from '@/components/QuickStart';
 import { KeyManagerModal } from '@/components/KeyManagerModal';
 import { DashboardStats, RequestLog, ApiKeyRecord } from '@/types';
-import { Shield, LogOut, User as UserIcon, ArrowRight, RotateCcw, Sparkles } from 'lucide-react';
+import { Shield, LogOut, User as UserIcon, ArrowRight, RotateCcw, Sparkles, Cpu, Zap, Radio } from 'lucide-react';
 
 const INITIAL_STATS: DashboardStats = {
   totalRequests: 0,
@@ -210,6 +210,61 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* Autonomous Agent Safeguard Invariant Status Ribbon */}
+        <section aria-label="Agent Firewall Status" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+          <div className="p-3 rounded-lg bg-surface-1 border border-border-subtle flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-zinc-300 font-semibold flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-primary" />
+                <span>Agent Circuit Breaker</span>
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-surface-2 text-emerald-400 border border-emerald-500/20 font-bold">
+              10 Max Loops
+            </span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-surface-1 border border-border-subtle flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="text-zinc-300 font-semibold flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Dynamic TTL Shield</span>
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-surface-2 text-zinc-300 border border-border-subtle font-semibold">
+              RFC 7234 Active
+            </span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-surface-1 border border-border-subtle flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-zinc-300 font-semibold flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-primary" />
+                <span>Chunked SSE Stream</span>
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-surface-2 text-emerald-400 border border-emerald-500/20 font-bold">
+              &lt; 5ms TTFT
+            </span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-surface-1 border border-border-subtle flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="text-zinc-300 font-semibold flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span>ZDR PII Scrubbing</span>
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-surface-2 text-zinc-300 border border-border-subtle font-semibold">
+              Luhn-Verified
+            </span>
+          </div>
+        </section>
 
         {/* 1. KPI Metric Cards */}
         <section aria-label="System Metrics">

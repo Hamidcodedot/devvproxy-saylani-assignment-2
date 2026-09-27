@@ -146,10 +146,10 @@ const FAQS = [
 ];
 
 const ROTATING_TERMS = [
-  'Cost Firewall',
-  'PII Data Shield',
-  '0ms Cache Layer',
-  'Outage Router',
+  'Agent Loop Breaker',
+  'Tool Output Data Shield',
+  '0ms Context Cache',
+  'Autonomous Agent Firewall',
 ];
 
 export default function HomePage() {
@@ -158,7 +158,7 @@ export default function HomePage() {
   const [copiedQuickstart, setCopiedQuickstart] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
-  const [heroTerminalTab, setHeroTerminalTab] = useState<'request' | 'response'>('request');
+  const [heroTerminalTab, setHeroTerminalTab] = useState<'request' | 'response' | 'circuit'>('request');
   const [isSimulatingWire, setIsSimulatingWire] = useState(false);
   const [currentTermIndex, setCurrentTermIndex] = useState(0);
 
@@ -190,8 +190,8 @@ export default function HomePage() {
     setIsSimulatingWire(true);
     setTimeout(() => {
       setIsSimulatingWire(false);
-      setHeroTerminalTab('response');
-    }, 400);
+      setHeroTerminalTab((prev) => (prev === 'request' ? 'response' : prev === 'response' ? 'circuit' : 'response'));
+    }, 350);
   };
 
   return (
@@ -316,15 +316,14 @@ export default function HomePage() {
         <section aria-labelledby="hero-title" className="text-center space-y-6 max-w-3xl mx-auto pt-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-1 border border-border-subtle text-xs font-mono text-zinc-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Zero-Overhead AI Gateway & Cost Firewall</span>
+            <span>Autonomous AI Agent Firewall</span>
             <span className="text-zinc-600">•</span>
-            <span className="text-emerald-400 font-semibold">1-Line Setup</span>
+            <span className="text-emerald-400 font-semibold">Phase 2 Shipped</span>
           </div>
 
           <h1 id="hero-title" className="text-4xl sm:text-6xl font-bold tracking-tight text-white leading-[1.15]">
-            <span>The Privacy-First AI Gateway</span>
+            <span>The Edge Firewall for</span>
             <br className="hidden sm:inline" />
-            <span className="text-zinc-400"> &amp; </span>
             <span className="inline-flex items-center text-emerald-400">
               <span
                 key={currentTermIndex}
@@ -340,7 +339,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-base sm:text-lg text-zinc-400 font-sans leading-relaxed max-w-2xl mx-auto">
-            A drop-in reverse proxy that scrubs customer PII at the edge, cuts LLM cloud bills with 0ms deterministic caching, and halts runaway loops before your card is drained.
+            A drop-in reverse proxy that protects autonomous agents from recursive runaway loops, scrubs sensitive tool outputs at the edge, and slashes LLM bills with 0ms deterministic context caching.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2 font-mono text-xs">
@@ -361,7 +360,7 @@ export default function HomePage() {
               href="/docs"
               className="min-h-[44px] px-5 py-3 rounded-md text-zinc-400 hover:text-white transition-colors flex items-center"
             >
-              Docs & Quickstart →
+              <span>Docs & Quickstart →</span>
             </Link>
           </div>
 
@@ -401,15 +400,33 @@ export default function HomePage() {
                       <Shield className="w-3 h-3 text-emerald-400" />
                       <span>edge-response.json</span>
                     </button>
+                    <button
+                      onClick={() => setHeroTerminalTab('circuit')}
+                      className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1.5 ${
+                        heroTerminalTab === 'circuit'
+                          ? 'bg-surface-2 text-rose-300 font-semibold shadow-xs'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Cpu className="w-3 h-3 text-rose-400" />
+                      <span>agent-guard.json</span>
+                    </button>
                   </div>
                 </div>
 
                 {/* Status Indicator & Action Buttons */}
                 <div className="flex items-center gap-2 text-[11px]">
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>200 OK • 0ms Cache Hit</span>
-                  </span>
+                  {heroTerminalTab === 'circuit' ? (
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
+                      <span>429 BLOCKED • Agent Runaway Intercepted</span>
+                    </span>
+                  ) : (
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>200 OK • 0ms Cache Hit</span>
+                    </span>
+                  )}
 
                   <button
                     onClick={handleSimulateWire}
@@ -451,6 +468,28 @@ export default function HomePage() {
                     </div>
                     <pre className="text-zinc-300 text-[11px] overflow-x-auto whitespace-pre leading-relaxed py-1">
                       <code>{quickstartCommand}</code>
+                    </pre>
+                  </div>
+                ) : heroTerminalTab === 'circuit' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px] text-zinc-500 border-b border-border-subtle/50 pb-1.5">
+                      <span className="text-rose-400 font-semibold">AUTONOMOUS AGENT RUNAWAY INTERCEPTION (RFC 7807)</span>
+                      <span className="text-rose-400 font-mono">Status: 429 Halted</span>
+                    </div>
+                    <pre className="text-rose-300/90 text-[11px] overflow-x-auto whitespace-pre leading-relaxed py-1">
+                      <code>{`{
+  "type": "https://devvproxy.com/errors/agent-circuit-breaker",
+  "title": "Autonomous Agent Circuit Breaker Tripped",
+  "status": 429,
+  "detail": "Autonomous agent runaway recursive loop detected (10 identical calls in 12s). Halted to prevent wallet drain.",
+  "x_devv_telemetry": {
+    "circuit_state": "OPEN",
+    "loop_count": 10,
+    "max_allowed_loops": 10,
+    "cost_saved": "$1.60",
+    "cooldown_remaining_sec": 30
+  }
+}`}</code>
                     </pre>
                   </div>
                 ) : (
@@ -639,7 +678,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Nightmare 2: Customer PII Leaks */}
+            {/* Nightmare 2: Customer PII & Tool Output Leaks */}
             <div className="p-6 rounded-xl bg-surface-1 border border-border-subtle space-y-3.5 hover:border-zinc-700 transition-all flex flex-col justify-between">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -647,18 +686,19 @@ export default function HomePage() {
                     <Shield className="w-4 h-4" />
                   </div>
                   <span className="px-2 py-0.5 rounded bg-surface-2 border border-border-subtle text-[10px] font-mono text-emerald-400 font-semibold">
-                    ReDoS Safe
+                    ReDoS Safe • Luhn Verified
                   </span>
                 </div>
                 <h3 className="text-base font-bold font-mono text-white">
-                  Zero-Leak Compliance Firewall
+                  Tool Output &amp; PII Data Leak Shield
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                  End users inevitably paste credit cards, SSNs, API tokens, and emails into prompts. DevvProxy verifies cards via mathematical Luhn checksums and scrubs them before packets ever touch model providers.
+                  Autonomous agents executing SQL queries, web scrapers, or shell tools inevitably leak production credentials, customer credit cards, and confidential records directly to external LLM providers. DevvProxy verifies cards via mathematical Luhn checksums and scrubs confidential entities before packets ever touch model providers.
                 </p>
               </div>
-              <div className="pt-3 border-t border-border-subtle text-[11px] font-mono text-zinc-500">
-                GDPR &amp; SOC2 Data Leak Prevention
+              <div className="pt-3 border-t border-border-subtle text-[11px] font-mono text-zinc-500 flex items-center justify-between">
+                <span>GDPR &amp; SOC2 Data Leak Prevention</span>
+                <span className="text-emerald-400">Zero Retention</span>
               </div>
             </div>
 
